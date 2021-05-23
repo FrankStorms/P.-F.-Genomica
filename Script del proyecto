@@ -1,0 +1,243 @@
+---
+title: "PF Genomica"
+author: "PÃ©rez Salcedo y Storms"
+date: "20/5/2021"
+output: html_document
+---
+
+Al hacer clic en el boton ** knitr **, se generara un documento que incluye tanto el contenido como la salida de cualquier fragmento de codigo R incrustado dentro del documento.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Si echo = F entonces no se imprimiran los graficos dentro del documento en R
+
+#1.-Cargamos las librerias que requeriremos para poder correr el scrip. 
+Scrip sacado de GEO2R al buscar dentro de la plataforma la base de datos GSE20347. 
+Un conjunto de datos es de muestras de células con un tejido esofágico adyacente normal, que se compara con el otro conjunto de células carcinomas escamosas de esófago.
+
+
+```{r}
+library(GEOquery)
+library(limma)
+library(umap)
+```
+
+  
+#2.- Carga de datos de serie y plataforma de GEO
+
+getGEO es una función para poder obtener la base de datos de NCBI que a su ves esten cargados dentro de GEO2R. Dentro del parentesis primero se pone entre comillas el codigo de la base de datos que uno desea extraer; GSEMatrix es por defaul True, para de esta manera solo usar las columnas con valores numericos dejandola en formato matriz. AnnotGPL en True para usar los datos mas recientes dentro de la plataforma, entiendo que no deberia haber diferencia en si se pone en T o F para fines de este ejercio. 
+```{r}
+gset <- getGEO("GSE20347", GSEMatrix =TRUE, AnnotGPL=TRUE)
+```
+
+
+Es para saber lo largo del objeto y visualizar el mismo
+```{r}
+gset
+length(gset)
+```
+#Entiendo que esta en un formato GEO porque se usa una función especial para que asi pueda correr las siguiente funciones, pero pense que si me arrojaria la matriz que se emplearia y no solo los metadatos.
+
+
+Este condicional if, me indica que si es la base de datos se considera más largo que 1 entonces se creara un objeto llamado idx en el que va a buscar la anotación GPL571 y a esta de los atributos en gset extraera los nombres. 
+#Entiendo que de esta manera se corrige un posible error para poder manejar mejor la base de datos, más no entiendo bien el porqué. Me parece que de esta forma la intención es solo quedarse con lo que esta dentro de de GPL571 aunque no entiendo bien que es lo que esta dentro y los nombres, sin más, pero no sé, y no creo que solo se este quedando con una lista de nombres.
+Y si no es mayor a uno, como es el caso, se crea igual un vector idx que va a valer uno (1) , y despues en la base de datos gset solo estaran los objetos que esten dentro del elemento 1, puesto que es el valor que tiene idx
+```{r}
+if (length(gset) > 1) idx <- grep("GPL571", attr(gset, "names")) else idx <- 1
+gset <- gset[[idx]]
+```
+#No entiendo porque se tiene que resaltar el uso de datos dentro del elemento 1 puesto que ya con el if estas indicando que si tiene mas de un elemento, entonces debe de modificarse la base de datos. Por otro lado tampoco entiendo porque la necesidad de crear el vector idx, puesto que uno podria simplemente poner el 1 dentro de los corchetes. En general no entiendo para que se necesita el objeto/vector idx
+
+
+# 4.- Hacer nombres de columna adecuados para que coincidan con la tabla
+fvarLabels ayuda a adentrarse a los metadatos de la base de datos de gset, y extrae en este caso los nombres de las columnas por medio de make.names y se los asigna a gset
+```{r}
+fvarLabels(gset) <- make.names(fvarLabels(gset))
+```
+#No entiendo como es que sucede esto sin la necesidad de hacer una reasignación de la base de datos de gset previa, ya que con el if de arriba y las indicaciónes iniciales asumo que se modifico la base de datos y por ello que se quieren recuperar los nombres, pero si se quieren recuperar de la misma base de datos que se modifico creo que uno esperaria el no recuperarlos de la misma, a no ser que los metadatos no cambien sin importar que tanto se modifique la base de datos que uno visualiza. 
+
+
+# 5.- Membresía de grupo para todas las muestras
+group membership for all samples
+
+Se genera el objeto gsms con un nombre numerico, los 0 corresponderan a la cantidad de muestras del control y el 1 a las muestras con el tratamiento determinado. 
+```{r}
+gsms <- "0000000000000000011111111111111111"
+```
+
+Se genera el objeto sml, en donde la función strplit va a dividir a los elementos del vector de caracteres de gsms, de tal modo que se formaran como subcadenas. Y solo se accedera a los elementos de la posición 1
+```{r}
+sml <- strsplit(gsms, split="")[[1]]
+```
+#No entiendo que es lo que hace split. 
+
+
+# 6.- Transformación a log2
+
+Se genera el objeto ex
+```{r}
+ex <- exprs(gset)
+```
+#No sé que hace exprs pero afecta a la base de datos gset y el resultado es almacenado en ex
+
+Se genera el objeto qx, se usa la función as.numeric, en donde por default todo lo que este dentro se pasara a un formato numerico. 
+La función quantile agarra el objeto ex y divide la distribución los datos en los valores dentro del vector. Por lo tanto se toma todos los valores y se ordenan de menor a mayor, y despues me arroja el valor que ocupe la posición de acuerdo al quantile solicitado. si es 1 me tomara el numero mayor y si es 0 el numero menor, pero si es .5 no me arrojara el numero que corresponde a la mitad de el numero mayor, si no el numero que este dentro de mi base de datos que este a la mitad, y solo si hay dos numeros que ocupan ese lugar, se sumaran y se dividiran entre 2 y se arrojara el valor resultante.
+na.rm en True hace que no calculen los cuantiles de las NA 
+```{r}
+qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+```
+
+Se genera el objeto LogC, en donde 
+```{r}
+LogC <- (qx[5] > 100) ||
+  (qx[6]-qx[1] > 50 && qx[2] > 0)
+```
+#Tengo una vaga idea pero no lo entiendo
+
+
+```{r}
+if (LogC) { ex[which(ex <= 0)] <- NaN
+exprs(gset) <- log2(ex) }
+```
+
+# 7.- Asignar muestras a grupos y configurar la matriz de diseño.
+
+```{r}
+gs <- factor(sml)
+groups <- make.names(c("1","2"))
+levels(gs) <- groups
+gset$group <- gs
+design <- model.matrix(~group + 0, gset)
+colnames(design) <- levels(gs)
+
+fit <- lmFit(gset, design)  # fit linear model
+```
+
+
+# 8.- establecer contrastes de interés y recalcular los coeficientes del modelo
+
+```{r}
+cts <- paste(groups[1], groups[2], sep="-")
+cont.matrix <- makeContrasts(contrasts=cts, levels=design)
+fit2 <- contrasts.fit(fit, cont.matrix)
+```
+
+
+# 9.- calcular estadísticas y una tabla de los genes más importantes
+
+```{r}
+fit2 <- eBayes(fit2, 0.01)
+tT <- topTable(fit2, adjust="fdr", sort.by="B", number=250)
+tT <- subset(tT, select=c("ID","adj.P.Val","P.Value","t","B","logFC","Gene.symbol","Gene.title"))
+write.table(tT, file=stdout(), row.names=F, sep="\t")
+```
+
+
+# 10.- Visualizar y controlar los resultados de las pruebas.
+# Construya un histograma de valores P para todos los genes. Prueba normal
+# La suposición es que la mayoría de los genes no se expresan diferencialmente.
+# assumption is that most genes are not differentially expressed.
+
+```{r}
+tT2 <- topTable(fit2, adjust="fdr", sort.by="B", number=Inf)
+hist(tT2$adj.P.Val, col = "grey", border = "white", xlab = "P-adj",
+     ylab = "Number of genes", main = "P-adj value distribution")
+```
+
+
+# 11.- resumir los resultados de la prueba como "arriba", "abajo" o "no expresado"
+
+```{r}
+dT <- decideTests(fit2, adjust.method="fdr", p.value=0.05)
+```
+
+
+# 12.- Diagrama de Venn de resultados
+
+```{r}
+vennDiagram(dT, circle.col=palette())
+```
+
+
+# 13.- crear gráfica Q-Q para el estadístico t
+
+```{r}
+t.good <- which(!is.na(fit2$F)) # filter out bad probes
+qqt(fit2$t[t.good], fit2$df.total[t.good], main="Moderated t statistic")
+```
+
+
+# 14.- gráfico de volcán (log P valor vs log fold change)
+
+```{r}
+colnames(fit2) # list contrast names
+ct <- 1        # choose contrast of interest
+volcanoplot(fit2, coef=ct, main=colnames(fit2)[ct], pch=20,
+            highlight=length(which(dT[,ct]!=0)), names=rep('+', nrow(fit2)))
+```
+
+
+# 15.- Grafica MD (log fold change vs Expresión logaritmica media)
+# resaltar sondas estadísticamente significativas (p-adj <0.05)
+
+```{r}
+plotMD(fit2, column=ct, status=dT[,ct], legend=F, pch=20, cex=1)
+abline(h=0)
+```
+
+
+################################################################
+
+
+# 16.- Análisis de datos de expresión general
+
+```{r}
+ex <- exprs(gset)
+```
+
+
+# 17.- Diagrama box-and-whisker
+
+```{r}
+dev.new(width=3+ncol(gset)/6, height=5)
+ord <- order(gs)  # order samples by group
+palette(c("#1B9E77", "#7570B3", "#E7298A", "#E6AB02", "#D95F02",
+          "#66A61E", "#A6761D", "#B32424", "#B324B3", "#666666"))
+par(mar=c(7,4,2,1))
+title <- paste ("GSE20347", "/", annotation(gset), sep ="")
+boxplot(ex[,ord], boxwex=0.6, notch=T, main=title, outline=FALSE, las=2, col=gs[ord])
+legend("topleft", groups, fill=palette(), bty="n")
+dev.off()
+```
+
+
+# 18.- expression value distribution
+
+```{r}
+par(mar=c(4,4,2,1))
+title <- paste ("GSE20347", "/", annotation(gset), " value distribution", sep ="")
+plotDensities(ex, group=gs, main=title, legend ="topright")
+```
+
+
+# 19.- UMAP plot (dimensionality reduction)
+
+```{r}
+ex <- na.omit(ex) # eliminate rows with NAs
+ex <- ex[!duplicated(ex), ]  # remove duplicates
+ump <- umap(t(ex), n_neighbors = 14, random_state = 123)
+par(mar=c(3,3,2,6), xpd=TRUE)
+plot(ump$layout, main="UMAP plot, nbrs=14", xlab="", ylab="", col=gs, pch=20, cex=1.5)
+legend("topright", inset=c(-0.15,0), legend=levels(gs), pch=20,
+       col=1:nlevels(gs), title="Group", pt.cex=1.5)
+library("maptools")  # point labels without overlaps
+pointLabel(ump$layout, labels = rownames(ump$layout), method="SANN", cex=0.6)
+```
+
+
+# 20.- mean-variance trend, helps to see if precision weights are needed
+
+```{r}
+plotSA(fit2, main="Mean variance trend, GSE20347")
