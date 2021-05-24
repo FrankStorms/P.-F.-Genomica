@@ -228,6 +228,7 @@ abline(h=0)
 
 # 16.- Análisis de datos de expresión general
 
+Se genera el objeto ex, y se usa la función exprs en la base de datos gset, la cual nos dara una base de datos con los valores de expresión
 ```{r}
 ex <- exprs(gset)
 ```
@@ -235,27 +236,66 @@ ex <- exprs(gset)
 
 # 17.- Diagrama box-and-whisker
 
+dev.new devuelve el valor de retorno del dispositivo abierto, normalmente invisible NULL. Cada columna tendria un 3 cada columna de la base de datos gset entre 6 y una altura de 5
 ```{r}
 dev.new(width=3+ncol(gset)/6, height=5)
-ord <- order(gs)  # order samples by group
+```
+
+Se ordenan las muestras por grupo
+```{r}
+ord <- order(gs)
+```
+
+Se determinan los colores de cada columna
+```{r}
 palette(c("#1B9E77", "#7570B3", "#E7298A", "#E6AB02", "#D95F02",
           "#66A61E", "#A6761D", "#B32424", "#B324B3", "#666666"))
+```
+
+Afecta parametros de la grafica
+```{r}
 par(mar=c(7,4,2,1))
+```
+#No estoy muy seguro que hace la función mar
+
+Es para determinar el titulo, se concatena lo que uno quiere poner como titulo
+```{r}
 title <- paste ("GSE20347", "/", annotation(gset), sep ="")
+```
+
+Se genera el boxplot, y se determinana los parametros del formato estetico
+```{r}
 boxplot(ex[,ord], boxwex=0.6, notch=T, main=title, outline=FALSE, las=2, col=gs[ord])
+```
+
+
+```{r}
 legend("topleft", groups, fill=palette(), bty="n")
+```
+#No sé bien 
+
+
+```{r}
 dev.off()
 ```
 
-
 # 18.- expression value distribution
 
+Afecta parametros de la grafica
 ```{r}
 par(mar=c(4,4,2,1))
+```
+#No sé bien que hace mar
+
+Se determinana los titulos, concatenando los nombres de interes
+```{r}
 title <- paste ("GSE20347", "/", annotation(gset), " value distribution", sep ="")
-plotDensities(ex, group=gs, main=title, legend ="topright")
 ```
 
+Se hace una grafica de densidades y se determinan algunos parametros de la misma
+```{r}
+plotDensities(ex, group=gs, main=title, legend ="topright")
+```
 
 # 19.- UMAP plot (dimensionality reduction)
 
@@ -274,5 +314,7 @@ pointLabel(ump$layout, labels = rownames(ump$layout), method="SANN", cex=0.6)
 
 # 20.- mean-variance trend, helps to see if precision weights are needed
 
+Se hace el plotSA
 ```{r}
 plotSA(fit2, main="Mean variance trend, GSE20347")
+```
