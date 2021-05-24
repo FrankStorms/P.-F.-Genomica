@@ -76,11 +76,11 @@ sml <- strsplit(gsms, split="")[[1]]
 
 # 6.- Transformación a log2
 
-Se genera el objeto ex
+Se genera el objeto ex, y se usa la función exprs en la base de datos gset, la cual nos dara una base de datos con los valores de expresión
 ```{r}
 ex <- exprs(gset)
 ```
-#No sé que hace exprs pero afecta a la base de datos gset y el resultado es almacenado en ex
+#No sé a que se refiere con los valores de expresión
 
 Se genera el objeto qx, se usa la función as.numeric, en donde por default todo lo que este dentro se pasara a un formato numerico. 
 La función quantile agarra el objeto ex y divide la distribución los datos en los valores dentro del vector. Por lo tanto se toma todos los valores y se ordenan de menor a mayor, y despues me arroja el valor que ocupe la posición de acuerdo al quantile solicitado. si es 1 me tomara el numero mayor y si es 0 el numero menor, pero si es .5 no me arrojara el numero que corresponde a la mitad de el numero mayor, si no el numero que este dentro de mi base de datos que este a la mitad, y solo si hay dos numeros que ocupan ese lugar, se sumaran y se dividiran entre 2 y se arrojara el valor resultante.
@@ -94,36 +94,71 @@ Se genera el objeto LogC, en donde
 LogC <- (qx[5] > 100) ||
   (qx[6]-qx[1] > 50 && qx[2] > 0)
 ```
-#Tengo una vaga idea pero no lo entiendo
+#Tengo una muy vaga idea pero no lo entiendo. Parece que la suma de los quantiles debe ser o sera mayor a 100 o si no, entonces la suma de los cuantiles menos el primero debe ser mayor a 50 y eso se debe dividir entre el segundo cuantil que debe ser mayor a 0 
 
-
+Se inicia ciclo if, en donde por lo que entiendo, a todos los valores que tienen 0 menos se les cambie por NaN.
+Es algo asi como, con base en lo obtenido en LogC si en la base de datos ex, y con which lo que hace es indicar que se coloquen los elementos en donde se cumple la condición de que en la base de datos ex estan los valores menor o igual a cero y entonces todos esos espacios que sean remplazados por NaN
+Luego a los valores de expresión de la base de datos de gset se van a cambiar por los datos en la base de datos ex al logaritmo base 2
 ```{r}
 if (LogC) { ex[which(ex <= 0)] <- NaN
 exprs(gset) <- log2(ex) }
 ```
 
+
 # 7.- Asignar muestras a grupos y configurar la matriz de diseño.
 
+Se hace un objeto llamado gs, en donde se usa el comando factor para generar los mismos, con base en la base de datos sml
 ```{r}
 gs <- factor(sml)
+```
+Luego se determinan los grupos, se usa la función make.names y se hace un vector con los nombres de los factores, en este caso 1 y 2
+```{r}
 groups <- make.names(c("1","2"))
-levels(gs) <- groups
-gset$group <- gs
-design <- model.matrix(~group + 0, gset)
-colnames(design) <- levels(gs)
-
-fit <- lmFit(gset, design)  # fit linear model
 ```
 
+Se juntan los niveles a los nombres generados
+```{r}
+levels(gs) <- groups
+```
+
+A la base se datos gset, se toma la columata group (o se genera), y se le agregan los niveles determinados con base a gs
+```{r}
+gset$group <- gs
+```
+
+Se crea el objeto design, se usa el comando model.matrix el cual genera una matriz de diseño o modelo con respecto a los datos en la columna group de la base de datos gset
+```{r}
+design <- model.matrix(~group + 0, gset)
+```
+#No entiendo bajo que condiciones se esta generando el modelo de matriz 
+
+En la columna de nombres de la base de datos design se le asignan los niveles de la base de datos gs
+```{r}
+colnames(design) <- levels(gs)
+```
+
+Con lmFit se ajustan los modelos lineales 
+```{r}
+fit <- lmFit(gset, design)
+```
+#No me queda muy claro si se ajustan con base en los niveles que se determinaron, por ende cada nivel se ajusta a un modelo lineal
 
 # 8.- establecer contrastes de interés y recalcular los coeficientes del modelo
 
+En ctc con el comando paste se concatenan los vectores que estan en groups columan 1 y 2 y estaran separados por -
 ```{r}
 cts <- paste(groups[1], groups[2], sep="-")
-cont.matrix <- makeContrasts(contrasts=cts, levels=design)
-fit2 <- contrasts.fit(fit, cont.matrix)
 ```
 
+En count.matrix con el comando makeContrasts se designan los contrastes que se utilizaran. Con contrastes designa el vector de caracteres, y con level se designan los nombres de los parametros, y/o de los contrastes que uno ha seleccionado.
+```{r}
+cont.matrix <- makeContrasts(contrasts=cts, levels=design)
+```
+
+Con el comando contrast.fit se usa la función fit para que la base de datos cont.matrix se ajuste a los datos de microarrays, calcule los coeficientes estimados y los errores estándar para un conjunto dado de contrastes.
+```{r}
+fit2 <- contrasts.fit(fit, cont.matrix)
+```
 
 # 9.- calcular estadísticas y una tabla de los genes más importantes
 
