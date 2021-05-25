@@ -299,18 +299,42 @@ plotDensities(ex, group=gs, main=title, legend ="topright")
 
 # 19.- UMAP plot (dimensionality reduction)
 
+De la base de datos ex, eliminamos las NAs
 ```{r}
-ex <- na.omit(ex) # eliminate rows with NAs
-ex <- ex[!duplicated(ex), ]  # remove duplicates
-ump <- umap(t(ex), n_neighbors = 14, random_state = 123)
-par(mar=c(3,3,2,6), xpd=TRUE)
-plot(ump$layout, main="UMAP plot, nbrs=14", xlab="", ylab="", col=gs, pch=20, cex=1.5)
-legend("topright", inset=c(-0.15,0), legend=levels(gs), pch=20,
-       col=1:nlevels(gs), title="Group", pt.cex=1.5)
-library("maptools")  # point labels without overlaps
-pointLabel(ump$layout, labels = rownames(ump$layout), method="SANN", cex=0.6)
+ex <- na.omit(ex) 
 ```
 
+Se retiran los duplicados de la base de datos ex. 
+```{r}
+ex <- ex[!duplicated(ex), ] 
+```
+
+umap es para calcular una aproximación multiple y una proyección, de la base de datos ex, 
+```{r}
+ump <- umap(t(ex), n_neighbors = 14, random_state = 123)
+```
+
+
+```{r}
+par(mar=c(3,3,2,6), xpd=TRUE)
+```
+
+```{r}
+plot(ump$layout, main="UMAP plot, nbrs=14", xlab="", ylab="", col=gs, pch=20, cex=1.5)
+```
+
+```{r}
+legend("topright", inset=c(-0.15,0), legend=levels(gs), pch=20,
+       col=1:nlevels(gs), title="Group", pt.cex=1.5)
+```
+
+```{r}
+library("maptools")  # point labels without overlaps
+```
+
+```{r}
+pointLabel(ump$layout, labels = rownames(ump$layout), method="SANN", cex=0.6)
+```
 
 # 20.- mean-variance trend, helps to see if precision weights are needed
 
